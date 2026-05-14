@@ -4,10 +4,10 @@
 #include <memory>
 #include <string>
 
-#include "booster_client/client/rpc_client.hpp"
 #include "booster_client_interface/srv/set_mode.hpp"
 #include "booster_client_interface/srv/set_upper_control.hpp"
-#include "booster_joint_interface/srv/prepare_control_transition.hpp"
+#include "booster_interface/srv/rpc_service.hpp"
+#include "booster_joint_interface/srv/prepare_transition.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rmw/types.h"
 
@@ -23,7 +23,7 @@ private:
   using RpcService = booster_interface::srv::RpcService;
   using ModeSwitchService = booster_client_interface::srv::SetMode;
   using UpperControlService = booster_client_interface::srv::SetUpperControl;
-  using JointPrepareService = booster_joint_interface::srv::PrepareControlTransition;
+  using JointPrepareService = booster_joint_interface::srv::PrepareTransition;
 
   void handle_mode_switch_request(
     std::shared_ptr<rclcpp::Service<ModeSwitchService>> service_handle,

@@ -14,7 +14,6 @@ find_package(rclcpp REQUIRED)
 
 add_library(${PROJECT_NAME}_lib
   src/node/rpc_client_node.cpp
-  src/client/rpc_client.cpp
 )
 target_compile_features(${PROJECT_NAME}_lib PUBLIC cxx_std_17)
 target_include_directories(${PROJECT_NAME}_lib PUBLIC
@@ -29,13 +28,23 @@ ament_target_dependencies(${PROJECT_NAME}_lib
   rclcpp
 )
 
+add_executable(rpc_client_node src/main.cpp)
+target_link_libraries(rpc_client_node ${PROJECT_NAME}_lib)
+ament_target_dependencies(
+  rpc_client_node
+  booster_interface
+  booster_client_interface
+  booster_joint_interface
+  rclcpp
+)
+
 install(
   DIRECTORY include/
   DESTINATION include
 )
 
 install(
-  TARGETS ${PROJECT_NAME}_lib
+  TARGETS ${PROJECT_NAME}_lib rpc_client_node
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}

@@ -1,6 +1,6 @@
 #include "booster_client/node/rpc_client_node.hpp"
 
-#include "booster_interface/booster_interface/message_utils.hpp"
+#include "booster_interface/message_utils.hpp"
 
 #include <future>
 
@@ -10,9 +10,9 @@ namespace booster_client
 RpcClientNode::RpcClientNode(const rclcpp::Node::SharedPtr & node)
 {
   b1_client = node->create_client<RpcService>("booster_rpc_service");
-  joint_client = node->create_client<JointPrepareService>("prepare_control_transition");
+  joint_client = node->create_client<JointPrepareService>("prep_transition_service");
   mode_switch_service = node->create_service<ModeSwitchService>(
-    "set_mode",
+    "client/set_mode",
     [this](
       std::shared_ptr<rclcpp::Service<ModeSwitchService>> service_handle,
       std::shared_ptr<rmw_request_id_t> request_header,
@@ -20,7 +20,7 @@ RpcClientNode::RpcClientNode(const rclcpp::Node::SharedPtr & node)
       handle_mode_switch_request(service_handle, request_header, req);
     });
   upper_control_service = node->create_service<UpperControlService>(
-    "set_upper_control",
+    "client/set_upper_control",
     [this](
       std::shared_ptr<rclcpp::Service<UpperControlService>> service_handle,
       std::shared_ptr<rmw_request_id_t> request_header,
@@ -48,7 +48,7 @@ void RpcClientNode::handle_mode_switch_request(
 
   auto joint_req = std::make_shared<JointPrepareService::Request>();
   joint_req->command.transition =
-    booster_joint_interface::msg::PrepareControlTransitionCommand::TRANSITION_MODE_SWITCH;
+    booster_joint_interface::msg::TransitionCommand::TRANSITION_MODE_SWITCH;
   joint_req->command.target_mode = req->mode;
 
   joint_client->async_send_request(
@@ -95,7 +95,7 @@ void RpcClientNode::handle_upper_control_request(
 
   auto joint_req = std::make_shared<JointPrepareService::Request>();
   joint_req->command.transition =
-    booster_joint_interface::msg::PrepareControlTransitionCommand::TRANSITION_UPPER_BODY_CONTROL;
+    booster_joint_interface::msg::TransitionCommand::TRANSITION_UPPER_BODY_CONTROL;
   joint_req->command.upper_body_enable = req->enable;
 
   joint_client->async_send_request(
