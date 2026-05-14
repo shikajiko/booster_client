@@ -35,6 +35,7 @@ private:
     std::shared_ptr<rmw_request_id_t> request_header,
     std::shared_ptr<UpperControlService::Request> req);
 
+  rclcpp::Node::SharedPtr node;
   rclcpp::Client<RpcService>::SharedPtr b1_client;
   rclcpp::Client<JointPrepareService>::SharedPtr joint_client;
   rclcpp::Service<ModeSwitchService>::SharedPtr mode_switch_service;
