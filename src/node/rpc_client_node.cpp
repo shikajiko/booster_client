@@ -1,6 +1,7 @@
   #include "booster_client/node/rpc_client_node.hpp"
   #include "booster_interface/message_utils.hpp"
   #include <future>
+  #include <thread>
 
   namespace booster_client
   {
@@ -71,6 +72,8 @@
           return;
         }
 
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+
         auto rpc_req = std::make_shared<RpcService::Request>();
         rpc_req->msg = booster_interface::CreateMsg<
           booster::robot::b1::LocoApiId::kChangeMode,
@@ -134,6 +137,8 @@
           send_response(false);
           return;
         }
+
+        std::this_thread::sleep_for(std::chrono::seconds(2));
 
         auto rpc_req = std::make_shared<RpcService::Request>();
         rpc_req->msg = booster_interface::CreateMsg<

@@ -28,10 +28,10 @@ ament_target_dependencies(${PROJECT_NAME}_lib
   rclcpp
 )
 
-add_executable(rpc_client_node src/main.cpp)
-target_link_libraries(rpc_client_node ${PROJECT_NAME}_lib)
+add_executable(main src/main.cpp)
+target_link_libraries(main ${PROJECT_NAME}_lib)
 ament_target_dependencies(
-  rpc_client_node
+  main
   booster_interface
   booster_client_interface
   booster_joint_interface
@@ -44,7 +44,7 @@ install(
 )
 
 install(
-  TARGETS ${PROJECT_NAME}_lib rpc_client_node
+  TARGETS ${PROJECT_NAME}_lib main
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
