@@ -72,7 +72,7 @@
           return;
         }
 
-        std::this_thread::sleep_for(std::chrono::seconds(2));
+        std::this_thread::sleep_for(std::chrono::duration<float>(joint_res->delay_second));
 
         auto rpc_req = std::make_shared<RpcService::Request>();
         rpc_req->msg = booster_interface::CreateMsg<
@@ -138,7 +138,7 @@
           return;
         }
 
-        std::this_thread::sleep_for(std::chrono::seconds(2));
+        std::this_thread::sleep_for(std::chrono::duration<float>(joint_res->delay_second));
 
         auto rpc_req = std::make_shared<RpcService::Request>();
         rpc_req->msg = booster_interface::CreateMsg<
