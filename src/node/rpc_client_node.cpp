@@ -1,5 +1,7 @@
 #include "booster_client/node/rpc_client_node.hpp"
 #include "booster_interface/message_utils.hpp"
+
+#include <chrono>
 #include <future>
 #include <thread>
 
@@ -30,12 +32,12 @@ RpcClientNode::RpcClientNode(const rclcpp::Node::SharedPtr & node)
       handle_upper_control_request(service_handle, request_header, req);
     });
 
-  robot_state_subscriber = node->create_subscriber<RobotState>(
+  robot_state_subscriber = node->create_subscription<RobotState>(
     "/robot_states",
     10,
-    [this](const RobotState::SharedPtr msg) 
+    [this](const RobotState::SharedPtr msg)
     {
-        this->update_robot_state(msg);
+      this->update_robot_state(msg);
     });
 }
 
@@ -45,7 +47,8 @@ void RpcClientNode::handle_mode_switch_request(
   std::shared_ptr<ModeSwitchService::Request> req)
 {
   auto send_response =
-    [service_handle, request_header](bool success) {
+    [service_handle, request_header](bool success)
+    {
       auto res = std::make_shared<ModeSwitchService::Response>();
       res->success = success;
       service_handle->send_response(*request_header, *res);
@@ -60,47 +63,13 @@ void RpcClientNode::handle_mode_switch_request(
     return;
   }
 
-  auto joint_req = std::make_shared<JointPrepareService::Request>();
-  joint_req->command.transition =
-    booster_joint_interface::msg::TransitionCommand::TRANSITION_MODE_SWITCH;
-  joint_req->command.target_mode = req->mode;
+  const uint8_t target_mode = req->mode;
 
-  joint_client->async_send_request(
-    joint_req,
-    [this, mode = req->mode, send_response](
-      rclcpp::Client<JointPrepareService>::SharedFuture future) {
-      auto joint_res = future.get();
-
-      if (!joint_res->success) {
-        RCLCPP_WARN(
-          node->get_logger(),
-          "Joint prepare for mode switch failed, cannot switch mode");
-
-        send_response(false);
-        return;
-      }
-
-      std::this_thread::sleep_for(std::chrono::duration<float>(joint_res->delay_second));
-
-      auto rpc_req = std::make_shared<RpcService::Request>();
-      rpc_req->msg = booster_interface::CreateMsg<
-        booster::robot::b1::LocoApiId::kChangeMode,
-        booster::robot::b1::ChangeModeParameter>(
-        static_cast<booster::robot::RobotMode>(mode));
-
-      b1_client->async_send_request(
-        rpc_req,
-        [this, send_response](rclcpp::Client<RpcService>::SharedFuture future) {
-          auto rpc_res = future.get();
-          const bool success = rpc_res->msg.status == 0;
-
-          if (!success) {
-            RCLCPP_WARN(node->get_logger(), "Mode switch rpc failed");
-          }
-
-          send_response(success);
-        });
-    });
+  if (need_prep_first(target_mode)) {
+    execute_prep_transition(target_mode, send_response);
+  } else {
+    execute_target_transition(target_mode, send_response);
+  }
 }
 
 void RpcClientNode::handle_upper_control_request(
@@ -109,7 +78,8 @@ void RpcClientNode::handle_upper_control_request(
   std::shared_ptr<UpperControlService::Request> req)
 {
   auto send_response =
-    [service_handle, request_header](bool success) {
+    [service_handle, request_header](bool success)
+    {
       auto res = std::make_shared<UpperControlService::Response>();
       res->success = success;
       service_handle->send_response(*request_header, *res);
@@ -125,40 +95,153 @@ void RpcClientNode::handle_upper_control_request(
     return;
   }
 
-  auto joint_req = std::make_shared<JointPrepareService::Request>();
-  joint_req->command.transition =
-    booster_joint_interface::msg::TransitionCommand::TRANSITION_UPPER_BODY_CONTROL;
-  joint_req->command.upper_body_enable = req->enable;
+  execute_upper_control_transition(req->enable, send_response);
+}
 
-  joint_client->async_send_request(
-    joint_req,
-    [this, enable = req->enable, send_response](
-      rclcpp::Client<JointPrepareService>::SharedFuture future) {
-      auto joint_res = future.get();
+void RpcClientNode::execute_target_transition(
+  uint8_t target_mode,
+  std::function<void(bool)> send_response)
+{
+  TransitionCommand cmd;
+  cmd.transition = TransitionCommand::TRANSITION_MODE_SWITCH;
+  cmd.target_mode = target_mode;
 
+  send_joint_request(
+    cmd,
+    [this, target_mode, send_response](JointPrepareService::Response::SharedPtr joint_res)
+    {
       if (!joint_res->success) {
         RCLCPP_WARN(
           node->get_logger(),
-          "Joint prepare for upper body custom control failed, cannot %s upper body custom control",
-          enable ? "enable" : "disable");
+          "Joint prepare for mode switch failed");
 
         send_response(false);
         return;
       }
 
-      std::this_thread::sleep_for(std::chrono::duration<float>(joint_res->delay_second));
+      std::this_thread::sleep_for(
+        std::chrono::duration<float>(joint_res->delay_second));
 
-      auto rpc_req = std::make_shared<RpcService::Request>();
-      rpc_req->msg = booster_interface::CreateMsg<
-        booster::robot::b1::LocoApiId::kUpperBodyCustomControl,
-        booster::robot::b1::UpperBodyCustomControlParameter>(enable);
+      send_mode_request(
+        target_mode,
+        [this, send_response](bool success)
+        {
+          if (!success) {
+            RCLCPP_WARN(
+              node->get_logger(),
+              "Mode switch rpc failed");
+          }
 
-      b1_client->async_send_request(
-        rpc_req,
-        [this, enable, send_response](rclcpp::Client<RpcService>::SharedFuture future) {
-          auto rpc_res = future.get();
-          const bool success = rpc_res->msg.status == 0;
+          send_response(success);
+        });
+    });
+}
 
+void RpcClientNode::execute_prep_transition(
+  uint8_t target_mode,
+  std::function<void(bool)> send_response)
+{
+  TransitionCommand cmd;
+  cmd.transition = TransitionCommand::TRANSITION_MODE_SWITCH;
+  cmd.target_mode = target_mode;
+
+  send_joint_request(
+    cmd,
+    [this, target_mode, send_response](JointPrepareService::Response::SharedPtr joint_res)
+    {
+      if (!joint_res->success) {
+        RCLCPP_WARN(
+          node->get_logger(),
+          "Joint prepare for prep mode failed");
+
+        send_response(false);
+        return;
+      }
+
+      std::this_thread::sleep_for(
+        std::chrono::duration<float>(joint_res->delay_second));
+
+      send_mode_request(
+        TransitionCommand::MODE_STAND,
+        [this, target_mode, send_response](bool success)
+        {
+          if (!success) {
+            RCLCPP_WARN(
+              node->get_logger(),
+              "Prep mode rpc failed");
+
+            send_response(false);
+            return;
+          }
+
+          execute_target_transition(target_mode, send_response);
+        });
+    });
+}
+
+void RpcClientNode::send_joint_request(
+  TransitionCommand command,
+  std::function<void(JointPrepareService::Response::SharedPtr)> cb)
+{
+  auto req = std::make_shared<JointPrepareService::Request>();
+  req->command = std::move(command);
+
+  joint_client->async_send_request(
+    req,
+    [cb](rclcpp::Client<JointPrepareService>::SharedFuture future)
+    {
+      cb(future.get());
+    });
+}
+
+void RpcClientNode::send_mode_request(
+  uint8_t mode,
+  std::function<void(bool)> cb)
+{
+  auto req = std::make_shared<RpcService::Request>();
+
+  req->msg = booster_interface::CreateMsg<
+    booster::robot::b1::LocoApiId::kChangeMode,
+    booster::robot::b1::ChangeModeParameter>(
+      static_cast<booster::robot::RobotMode>(mode));
+
+  b1_client->async_send_request(
+    req,
+    [cb](rclcpp::Client<RpcService>::SharedFuture future)
+    {
+      auto res = future.get();
+      cb(res->msg.status == 0);
+    });
+}
+
+void RpcClientNode::execute_upper_control_transition(
+  bool enable,
+  std::function<void(bool)> send_response)
+{
+  TransitionCommand cmd;
+  cmd.transition = TransitionCommand::TRANSITION_UPPER_BODY_CONTROL;
+  cmd.upper_body_enable = enable;
+
+  send_joint_request(
+    cmd,
+    [this, enable, send_response](JointPrepareService::Response::SharedPtr joint_res)
+    {
+      if (!joint_res->success) {
+        RCLCPP_WARN(
+          node->get_logger(),
+          "Joint prepare for upper body custom control failed");
+
+        send_response(false);
+        return;
+      }
+
+      std::this_thread::sleep_for(
+        std::chrono::duration<float>(joint_res->delay_second));
+
+      send_upper_control_request(
+        enable,
+        [this, enable, send_response](bool success)
+        {
           if (success) {
             RCLCPP_WARN(
               node->get_logger(),
@@ -176,10 +259,59 @@ void RpcClientNode::handle_upper_control_request(
     });
 }
 
-void RpcClient::update_robot_state(RobotState::SharedPtr msg) 
+void RpcClientNode::send_upper_control_request(
+  bool enable,
+  std::function<void(bool)> cb)
 {
-  this.current_mode = static_cast<RobotMode>(msg->current_mode);
-  this.upc_status = int_to_upper_control(msg->current_body_control);
+  auto req = std::make_shared<RpcService::Request>();
+
+  req->msg = booster_interface::CreateMsg<
+    booster::robot::b1::LocoApiId::kUpperBodyCustomControl,
+    booster::robot::b1::UpperBodyCustomControlParameter>(enable);
+
+  b1_client->async_send_request(
+    req,
+    [cb](rclcpp::Client<RpcService>::SharedFuture future)
+    {
+      auto res = future.get();
+      cb(res->msg.status == 0);
+    });
+}
+
+void RpcClientNode::update_robot_state(RobotState::SharedPtr msg)
+{
+  current_mode = static_cast<RobotMode>(msg->current_mode);
+}
+
+bool RpcClientNode::need_prep_first(uint8_t target_mode)
+{
+  const uint8_t current_transition_mode = to_transition_mode(current_mode);
+
+  if ((current_transition_mode == TransitionCommand::MODE_CUSTOM &&
+       target_mode == TransitionCommand::MODE_WALK) ||
+      (current_transition_mode == TransitionCommand::MODE_WALK &&
+       target_mode == TransitionCommand::MODE_CUSTOM))
+  {
+    return true;
+  }
+
+  return false;
+}
+
+uint8_t RpcClientNode::to_transition_mode(RobotMode mode)
+{
+  switch (mode) {
+    case RobotMode::DAMP:
+      return TransitionCommand::MODE_DAMPING;
+    case RobotMode::PREP:
+      return TransitionCommand::MODE_STAND;
+    case RobotMode::WALK:
+      return TransitionCommand::MODE_WALK;
+    case RobotMode::CUSTOM:
+      return TransitionCommand::MODE_CUSTOM;
+    default:
+      return TransitionCommand::MODE_DAMPING;
+  }
 }
 
 }  // namespace booster_client

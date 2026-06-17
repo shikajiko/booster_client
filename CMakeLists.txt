@@ -10,6 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(booster_interface REQUIRED)
 find_package(booster_client_interface REQUIRED)
 find_package(booster_joint_interface REQUIRED)
+find_package(booster_model REQUIRED)
 find_package(rclcpp REQUIRED)
 
 add_library(${PROJECT_NAME}_lib
@@ -25,6 +26,7 @@ ament_target_dependencies(${PROJECT_NAME}_lib
   booster_interface
   booster_client_interface
   booster_joint_interface
+  booster_model
   rclcpp
 )
 
@@ -35,6 +37,7 @@ ament_target_dependencies(
   booster_interface
   booster_client_interface
   booster_joint_interface
+  booster_model
   rclcpp
 )
 
