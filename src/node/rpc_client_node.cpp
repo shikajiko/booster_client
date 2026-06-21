@@ -132,6 +132,7 @@ void RpcClientNode::execute_target_transition(
               "Mode switch rpc failed");
           }
 
+          std::this_thread::sleep_for(std::chrono::milliseconds(500));
           send_response(success);
         });
     });
@@ -174,6 +175,7 @@ void RpcClientNode::execute_prep_transition(
             return;
           }
 
+          std::this_thread::sleep_for(std::chrono::milliseconds(500));
           execute_target_transition(target_mode, send_response);
         });
     });
@@ -254,6 +256,7 @@ void RpcClientNode::execute_upper_control_transition(
               enable ? "enable" : "disable");
           }
 
+          std::this_thread::sleep_for(std::chrono::milliseconds(500));
           send_response(success);
         });
     });
