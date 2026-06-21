@@ -257,7 +257,7 @@ void RpcClientNode::execute_upper_control_transition(
             return;
           }
 
-          std::this_thread::sleep_for(std::chrono::milliseconds(500));
+          std::this_thread::sleep_for(std::chrono::milliseconds(2000));
 
           RCLCPP_INFO(
             node->get_logger(),
