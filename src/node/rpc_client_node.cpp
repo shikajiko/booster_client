@@ -135,7 +135,7 @@ void RpcClientNode::execute_target_transition(
             return;
           }
 
-          std::this_thread::sleep_for(std::chrono::milliseconds(500));
+          std::this_thread::sleep_for(std::chrono::milliseconds(1000));
           send_response(true);
         });
     });
@@ -178,7 +178,7 @@ void RpcClientNode::execute_prep_transition(
             return;
           }
 
-          std::this_thread::sleep_for(std::chrono::milliseconds(500));
+          std::this_thread::sleep_for(std::chrono::milliseconds(1000));
           execute_target_transition(target_mode, send_response);
         });
     });
