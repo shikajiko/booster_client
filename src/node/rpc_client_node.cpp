@@ -130,10 +130,13 @@ void RpcClientNode::execute_target_transition(
             RCLCPP_WARN(
               node->get_logger(),
               "Mode switch rpc failed");
+
+            send_response(false);
+            return;
           }
 
           std::this_thread::sleep_for(std::chrono::milliseconds(500));
-          send_response(success);
+          send_response(true);
         });
     });
 }
@@ -202,7 +205,7 @@ void RpcClientNode::send_mode_request(
 {
   auto req = std::make_shared<RpcService::Request>();
 
-  req->msg = booster_interface::CreateMsg<
+  req->msg = booster_interface::CreateMsg
     booster::robot::b1::LocoApiId::kChangeMode,
     booster::robot::b1::ChangeModeParameter>(
       static_cast<booster::robot::RobotMode>(mode));
@@ -244,20 +247,24 @@ void RpcClientNode::execute_upper_control_transition(
         enable,
         [this, enable, send_response](bool success)
         {
-          if (success) {
-            RCLCPP_WARN(
-              node->get_logger(),
-              "Upper body custom control %s accepted",
-              enable ? "enable" : "disable");
-          } else {
+          if (!success) {
             RCLCPP_WARN(
               node->get_logger(),
               "Upper body custom control %s failed",
               enable ? "enable" : "disable");
+
+            send_response(false);
+            return;
           }
 
           std::this_thread::sleep_for(std::chrono::milliseconds(500));
-          send_response(success);
+
+          RCLCPP_INFO(
+            node->get_logger(),
+            "Upper body custom control %s accepted",
+            enable ? "enable" : "disable");
+
+          send_response(true);
         });
     });
 }
@@ -268,7 +275,7 @@ void RpcClientNode::send_upper_control_request(
 {
   auto req = std::make_shared<RpcService::Request>();
 
-  req->msg = booster_interface::CreateMsg<
+  req->msg = booster_interface::CreateMsg
     booster::robot::b1::LocoApiId::kUpperBodyCustomControl,
     booster::robot::b1::UpperBodyCustomControlParameter>(enable);
 
