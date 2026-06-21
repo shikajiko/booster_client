@@ -205,7 +205,7 @@ void RpcClientNode::send_mode_request(
 {
   auto req = std::make_shared<RpcService::Request>();
 
-  req->msg = booster_interface::CreateMsg
+  req->msg = booster_interface::CreateMsg<
     booster::robot::b1::LocoApiId::kChangeMode,
     booster::robot::b1::ChangeModeParameter>(
       static_cast<booster::robot::RobotMode>(mode));
@@ -275,7 +275,7 @@ void RpcClientNode::send_upper_control_request(
 {
   auto req = std::make_shared<RpcService::Request>();
 
-  req->msg = booster_interface::CreateMsg
+  req->msg = booster_interface::CreateMsg<
     booster::robot::b1::LocoApiId::kUpperBodyCustomControl,
     booster::robot::b1::UpperBodyCustomControlParameter>(enable);
 
